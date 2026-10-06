@@ -34,12 +34,20 @@ fi
 # then try to route every outbound request through a non-existent local proxy on
 # the hardcoded port 8080, breaking any environment (e.g. tests using mockserver)
 # where no proxy is actually configured.
+
+# In addition: when deploying this image to Kubernetes, the spring kubernetes addon
+# automatically kicks in and parses the environment variables HTTP[S]_PROXY. It expects
+# the normal format http[s]://<server>:<port> which is incompatible with Java which only
+# expects the host/IP and the port in the corresponding variables.
+# Hence we parse the environment variables and extract the needed information for Java.
 proxy_java_opts=()
 if [ -n "${HTTP_PROXY}" ]; then
-    proxy_java_opts+=("-Dhttp.proxyHost=${HTTP_PROXY}" "-Dhttp.proxyPort=8080")
+    [[ "${HTTP_PROXY}" =~ ^(https?://)?(.+):([0-9]+)$ ]] && { HTTP_PROXY_HOST=${BASH_REMATCH[2]}; HTTP_PROXY_PORT=${BASH_REMATCH[3]}; }
+    proxy_java_opts+=("-Dhttp.proxyHost=${HTTP_PROXY_HOST}" "-Dhttp.proxyPort=${HTTP_PROXY_PORT}")
 fi
 if [ -n "${HTTPS_PROXY}" ]; then
-    proxy_java_opts+=("-Dhttps.proxyHost=${HTTPS_PROXY}" "-Dhttps.proxyPort=8080")
+    [[ "${HTTPS_PROXY}" =~ ^(https?://)?(.+):([0-9]+)$ ]] && { HTTPS_PROXY_HOST=${BASH_REMATCH[2]}; HTTPS_PROXY_PORT=${BASH_REMATCH[3]}; }
+    proxy_java_opts+=("-Dhttps.proxyHost=${HTTPS_PROXY_HOST}" "-Dhttps.proxyPort=${HTTPS_PROXY_PORT}")
 fi
 if [ -n "${NO_PROXY}" ]; then
     proxy_java_opts+=("-Dhttp.nonProxyHosts=${NO_PROXY}")
